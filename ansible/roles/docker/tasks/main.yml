@@ -1,0 +1,63 @@
+- name: Assert Ubuntu
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.os_family == "Debian"
+      - ansible_facts.distribution == "Ubuntu"
+    fail_msg: "This role currently supports Ubuntu only."
+
+- name: Remove conflicting distro packages
+  when: docker_ubuntu_remove_conflicting
+  ansible.builtin.apt:
+    name: "{{ docker_ubuntu_conflicting_packages }}"
+    state: absent
+    purge: true
+    update_cache: false
+
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install prerequisite packages
+  ansible.builtin.apt:
+    name: "{{ docker_ubuntu_prereq_packages }}"
+    state: present
+
+- name: Ensure apt keyrings directory exists
+  ansible.builtin.file:
+    path: "{{ docker_ubuntu_keyring_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Download Docker GPG key (ASCII armored)
+  ansible.builtin.get_url:
+    url: "{{ docker_ubuntu_repo_uri }}/gpg"
+    dest: "{{ docker_ubuntu_keyring_path }}"
+    mode: "0644"
+
+- name: Add Docker apt repository (deb822)
+  ansible.builtin.deb822_repository:
+    name: docker
+    types: [deb]
+    uris: ["{{ docker_ubuntu_repo_uri }}"]
+    suites: ["{{ ansible_facts.distribution_release }}"]
+    components: "{{ docker_ubuntu_repo_components }}"
+    architectures: ["{{ ansible_facts.architecture }}"]
+    signed_by: "{{ docker_ubuntu_keyring_path }}"
+    state: present
+
+- name: Update apt cache after adding Docker repo
+  ansible.builtin.apt:
+    update_cache: true
+
+- name: Install Docker packages
+  ansible.builtin.apt:
+    name: "{{ docker_ubuntu_packages }}"
+    state: present
+
+- name: Enable and start Docker service
+  ansible.builtin.service:
+    name: "{{ docker_ubuntu_service_name }}"
+    enabled: true
+    state: started
+
