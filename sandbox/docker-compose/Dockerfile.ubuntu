@@ -1,0 +1,10 @@
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    salt-minion \
+ && rm -rf /var/lib/apt/lists/*
+
+CMD ["bash", "-lc", "printf 'master: %s\n' \"${SALT_MASTER_HOST:-master}\" > /etc/salt/minion.d/master.conf && salt-minion -l info"]
+
